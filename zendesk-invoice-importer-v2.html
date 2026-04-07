@@ -679,11 +679,16 @@ async function useContact(contact) {
 
     if (!c) {
       addLog("Creating new contact in Zendesk Sell...", "step");
-      const payload = { name: S.extracted.customerName || "Unknown Contact" };
+      const fullName = (S.extracted.customerName || "Unknown Contact").trim();
+      const nameParts = fullName.split(" ");
+      const firstName = nameParts.length > 1 ? nameParts.slice(0,-1).join(" ") : fullName;
+      const lastName = nameParts.length > 1 ? nameParts[nameParts.length-1] : "";
+      const payload = { first_name: firstName, last_name: lastName };
       if (S.extracted.customerEmail) payload.email = S.extracted.customerEmail;
-      if (S.extracted.customerPhone) payload.phone = S.extracted.customerPhone;
+      if (S.extracted.customerPhone) payload.mobile = S.extracted.customerPhone;
       const res = await zdFetch("POST", "/v2/contacts", { data: payload });
       c = res?.data;
+      c.name = ((c.first_name||"") + " " + (c.last_name||"")).trim();
       isNew = true;
       addLog("Contact created: " + c.name + " (ID: " + c.id + ")", "ok");
     } else {

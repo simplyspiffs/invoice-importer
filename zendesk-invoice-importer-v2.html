@@ -288,14 +288,12 @@ function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;"
 function fmtMoney(n) { return "$"+(parseFloat(n)||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function grandTotal() { return (S.extracted?.items||[]).reduce((s,it)=>s+(parseFloat(it.total)||0),0); }
 
-// ─── ZENDESK API ───────────────────────────────────────────────────────────────
+// ─── ZENDESK API (via local proxy) ────────────────────────────────────────────
 async function zdFetch(method, path, body) {
-  const res = await fetch("https://api.getbase.com" + path, {
+  const res = await fetch("http://localhost:3001/api/zd" + path, {
     method,
     headers: {
-      "Authorization": "Bearer " + TOKEN,
       "Content-Type": "application/json",
-      "Accept": "application/json",
     },
     body: body ? JSON.stringify(body) : undefined,
   });

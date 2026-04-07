@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Zendesk Sell — Invoice Importer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+  *, *::before, *::after { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'IBM Plex Sans',sans-serif; background:#0a0c10; color:#c9d1d9; min-height:100vh; }
+  ::-webkit-scrollbar{width:4px} ::-webkit-scrollbar-track{background:#0d1117} ::-webkit-scrollbar-thumb{background:#21262d;border-radius:4px}
+  @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+  .spin{animation:spin 1s linear infinite;display:inline-block}
+  .fade-up{animation:fadeUp .25s ease both}
+  input,select,textarea,button{font-family:inherit}
+  input:focus,select:focus,textarea:focus{outline:none}
+
+  .header{background:#0d1117;border-bottom:1px solid #21262d;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+  .header-left{display:flex;align-items:center;gap:14px}
+  .header-icon{width:36px;height:36px;background:#238636;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+  .header-title{font-family:'IBM Plex Mono',monospace;font-weight:700;font-size:14px;color:#e6edf3}
+  .header-title span{color:#3fb950}
+  .header-sub{font-size:11px;color:#6e7681;margin-top:1px}
+  .main{max-width:860px;margin:0 auto;padding:24px 20px 60px;display:flex;flex-direction:column;gap:14px}
+
+  .card{background:#161b22;border:1px solid #30363d;border-radius:8px;padding:18px 20px}
+  .card-dark{background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:18px 20px}
+  .section-label{font-size:11px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px}
+
+  .token-row{display:flex;gap:8px}
+  .token-wrap{position:relative;flex:1}
+  .token-input{width:100%;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:9px 40px 9px 10px;color:#e6edf3;font-size:12px;font-family:'IBM Plex Mono',monospace}
+  .token-eye{position:absolute;right:10px;top:50%;transform:translateY(-50%);background:transparent;border:none;color:#6e7681;cursor:pointer;font-size:15px}
+  .token-hint{margin-top:7px;font-size:11px;color:#6e7681;line-height:1.6}
+  .token-hint a{color:#58a6ff}
+  .token-saved-bar{display:flex;align-items:center;justify-content:space-between;background:#0d1f14;border:1px solid #238636;border-radius:6px;padding:9px 14px;margin-top:10px}
+  .token-saved-bar span{font-size:12px;color:#3fb950;font-weight:600}
+
+  .btn{border-radius:6px;padding:8px 16px;font-weight:600;font-size:13px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:filter .15s;white-space:nowrap;border:1px solid transparent}
+  .btn:hover{filter:brightness(1.15)}
+  .btn:disabled{opacity:.5;cursor:not-allowed;filter:none}
+  .btn-green{background:#238636;border-color:#2ea043;color:#fff}
+  .btn-blue{background:#1f6feb;border-color:#388bfd;color:#fff}
+  .btn-gray{background:#161b22;border-color:#30363d;color:#8b949e}
+  .btn-ghost{background:transparent;border-color:#30363d;color:#8b949e}
+  .btn-sm{padding:5px 12px;font-size:12px}
+  .btn-full{width:100%;justify-content:center}
+
+  .upload-zone{border:2px dashed #30363d;border-radius:10px;padding:60px 24px;text-align:center;cursor:pointer;background:#0d1117;transition:all .2s}
+  .upload-zone:hover,.upload-zone.drag{border-color:#238636;background:#0d1f14}
+
+  .log-panel{background:#0d1117;border:1px solid #21262d;border-radius:8px;padding:12px 14px;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.9;max-height:160px;overflow-y:auto}
+
+  .fields-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:14px}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field-label{font-size:11px;font-weight:600;color:#6e7681;text-transform:uppercase;letter-spacing:.8px}
+  .fi{background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px 10px;color:#e6edf3;font-size:13px;width:100%}
+  .fi.mono{font-family:'IBM Plex Mono',monospace}
+  textarea.fi{resize:vertical}
+
+  .items-hdr{display:grid;grid-template-columns:3fr 60px 100px 100px 28px;gap:4px;margin-bottom:6px}
+  .items-col{font-size:10px;font-weight:700;color:#6e7681;text-transform:uppercase;letter-spacing:.5px}
+  .item-row{display:grid;grid-template-columns:3fr 60px 100px 100px 28px;gap:4px;margin-bottom:4px;align-items:center}
+  .ii{background:#0d1117;border:1px solid #21262d;border-radius:4px;padding:6px 8px;color:#c9d1d9;font-size:12px;width:100%}
+  .ii.mono{font-family:'IBM Plex Mono',monospace}
+  .ii-total{background:#161b22;border:1px solid #21262d;border-radius:4px;padding:6px 8px;color:#3fb950;font-size:12px;font-family:'IBM Plex Mono',monospace;font-weight:700;width:100%}
+  .ii-rm{background:transparent;border:none;color:#f85149;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center;padding:0}
+  .items-footer{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding-top:8px;border-top:1px solid #21262d}
+  .btn-add-line{background:transparent;border:1px solid #21262d;border-radius:4px;padding:4px 10px;color:#58a6ff;font-size:11px;cursor:pointer;font-weight:600}
+  .grand-total{font-family:'IBM Plex Mono',monospace;font-weight:700;color:#3fb950;font-size:14px}
+
+  .export-box{background:#0d1f14;border:1px solid #238636;border-radius:8px;padding:20px;animation:fadeUp .25s ease both}
+  .export-title{font-weight:700;color:#3fb950;font-size:15px;margin-bottom:6px}
+  .export-sub{font-size:12px;color:#6e7681;margin-bottom:16px;line-height:1.7}
+  .export-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+  .export-card{background:#0a0c10;border:1px solid #21262d;border-radius:6px;padding:14px}
+  .export-card-title{font-size:12px;font-weight:700;color:#e6edf3;margin-bottom:4px}
+  .export-card-desc{font-size:11px;color:#6e7681;line-height:1.6;margin-bottom:10px}
+
+  .steps-box{background:#111a2b;border:1px solid #1f3a5f;border-radius:8px;padding:16px;margin-top:14px}
+  .steps-title{font-size:12px;font-weight:700;color:#58a6ff;margin-bottom:10px}
+  .step-row{display:flex;gap:10px;margin-bottom:8px;align-items:flex-start}
+  .step-num{width:20px;height:20px;background:#1f6feb;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;flex-shrink:0;margin-top:1px}
+  .step-text{font-size:12px;color:#8b949e;line-height:1.6}
+  .step-text a{color:#58a6ff}
+  .step-text code{background:#0d1117;padding:1px 5px;border-radius:3px;font-family:'IBM Plex Mono',monospace;font-size:11px;color:#e6edf3}
+
+  .spinner-wrap{text-align:center;padding:50px 24px;background:#0d1117;border:1px solid #21262d;border-radius:10px}
+  .how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .how-card{background:#161b22;border:1px solid #21262d;border-radius:6px;padding:14px}
+
+  @media(max-width:600px){
+    .fields-grid{grid-template-columns:1fr 1fr}
+    .how-grid{grid-template-columns:1fr}
+    .export-grid{grid-template-columns:1fr}
+    .header{padding:12px 14px}
+    .main{padding:14px 12px 60px}
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <div class="header-icon">📄</div>
+    <div>
+      <div class="header-title">ZenDesk Sell <span>Invoice Importer</span></div>
+      <div class="header-sub">AI extraction · CSV export · drag into Zendesk Sell</div>
+    </div>
+  </div>
+  <div id="statusBadge"></div>
+</div>
+
+<div class="main">
+
+  <!-- ANTHROPIC KEY -->
+  <div class="card" id="anthropicSection">
+    <div class="section-label">🤖 Anthropic API Key <span style="color:#f85149;font-size:10px;margin-left:6px">REQUIRED FOR AI EXTRACTION</span></div>
+    <div class="token-row" id="anthropicInputRow">
+      <div class="token-wrap">
+        <input type="password" id="anthropicInput" class="token-input" placeholder="Paste your Anthropic API key (starts with sk-ant-...)"/>
+        <button class="token-eye" onclick="toggleEye('anthropicInput',this)">👁</button>
+      </div>
+      <button class="btn btn-green" onclick="saveKey('anthropic_api_key','anthropicInput','anthropicInputRow','anthropicSavedBar')">Save Key</button>
+    </div>
+    <div class="token-hint">
+      Get your key: <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys → Create Key · Saved on this computer automatically.
+    </div>
+    <div id="anthropicSavedBar" style="display:none" class="token-saved-bar">
+      <span>✓ Anthropic API key saved on this computer</span>
+      <button class="btn btn-ghost btn-sm" onclick="clearKey('anthropic_api_key','anthropicInput','anthropicInputRow','anthropicSavedBar')">Clear &amp; Change</button>
+    </div>
+  </div>
+
+  <!-- DYNAMIC AREA -->
+  <div id="app"></div>
+
+</div>
+
+<script>
+// ─── KEYS ──────────────────────────────────────────────────────────────────────
+var ANTHROPIC_KEY = "";
+
+function initKeys() {
+  var a = localStorage.getItem("anthropic_api_key");
+  if (a) { ANTHROPIC_KEY = a; showSaved("anthropicInputRow","anthropicSavedBar","anthropicInput",a); }
+  refreshBadge();
+}
+
+function saveKey(storageKey, inputId, rowId, barId) {
+  var v = document.getElementById(inputId).value.trim();
+  if (!v) { alert("Please paste your API key first."); return; }
+  if (storageKey === "anthropic_api_key" && !v.startsWith("sk-ant-")) {
+    alert("That doesn't look right — Anthropic keys start with sk-ant-"); return;
+  }
+  ANTHROPIC_KEY = v;
+  localStorage.setItem(storageKey, v);
+  showSaved(rowId, barId, inputId, v);
+  refreshBadge();
+}
+
+function clearKey(storageKey, inputId, rowId, barId) {
+  if (storageKey === "anthropic_api_key") ANTHROPIC_KEY = "";
+  localStorage.removeItem(storageKey);
+  document.getElementById(inputId).value = "";
+  document.getElementById(rowId).style.display = "flex";
+  document.getElementById(barId).style.display = "none";
+  refreshBadge();
+}
+
+function showSaved(rowId, barId, inputId, val) {
+  document.getElementById(inputId).value = val;
+  document.getElementById(rowId).style.display = "none";
+  document.getElementById(barId).style.display = "flex";
+}
+
+function toggleEye(inputId, btn) {
+  var i = document.getElementById(inputId);
+  i.type = i.type === "password" ? "text" : "password";
+  btn.textContent = i.type === "password" ? "👁" : "🙈";
+}
+
+function refreshBadge() {
+  document.getElementById("statusBadge").innerHTML = ANTHROPIC_KEY
+    ? '<span style="background:#23863622;color:#3fb950;border:1px solid #23863644;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:600;font-family:IBM Plex Mono,monospace">● READY</span>'
+    : '<span style="background:#f8514922;color:#f85149;border:1px solid #f8514944;border-radius:4px;padding:3px 10px;font-size:11px;font-weight:600;font-family:IBM Plex Mono,monospace">○ KEY NEEDED</span>';
+}
+
+// ─── STATE ─────────────────────────────────────────────────────────────────────
+var S = { phase:"idle", logs:[], extracted:null };
+
+// ─── LOGGING ───────────────────────────────────────────────────────────────────
+function addLog(msg, type) {
+  S.logs.push({msg:msg, type:type||"info"});
+  flushLogs();
+}
+function flushLogs() {
+  var p = document.getElementById("logPanel");
+  if (!p) return;
+  var c = {info:"#58a6ff",ok:"#3fb950",err:"#f85149",warn:"#d29922",step:"#d2a8ff"};
+  var px = {ok:"✓ ",err:"✗ ",warn:"⚠ ",step:"▶ ",info:"  "};
+  p.innerHTML = "";
+  S.logs.forEach(function(l,i) {
+    var d = document.createElement("div");
+    d.style.color = c[l.type]||"#8b949e";
+    d.innerHTML = '<span style="color:#30363d;margin-right:8px">'+String(i+1).padStart(2,"0")+"</span>"+(px[l.type]||"  ")+esc(l.msg);
+    p.appendChild(d);
+  });
+  p.scrollTop = p.scrollHeight;
+}
+
+function esc(s) { return String(s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+function fmtMoney(n) { return "$"+(parseFloat(n)||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function grandTotal() { return (S.extracted&&S.extracted.items||[]).reduce(function(s,it){return s+(parseFloat(it.total)||0);},0); }
+
+// ─── FILE HANDLING ─────────────────────────────────────────────────────────────
+function pickFile() { document.getElementById("fileIn").click(); }
+
+function handleDrop(e) {
+  e.preventDefault();
+  var z = document.getElementById("uploadZone");
+  if (z) z.classList.remove("drag");
+  var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+  if (f) startProcess(f);
+}
+
+async function startProcess(file) {
+  if (!ANTHROPIC_KEY) { alert("Please save your Anthropic API key first."); return; }
+  var ext = file.name.split(".").pop().toLowerCase();
+  if (["pdf","jpg","jpeg","png"].indexOf(ext) === -1) { alert("Please upload a PDF, JPG, or PNG."); return; }
+
+  S = { phase:"extracting", logs:[], extracted:null };
+  draw();
+
+  addLog("File: " + file.name + " (" + (file.size/1024).toFixed(1) + " KB)", "step");
+
+  var base64;
+  try {
+    base64 = await new Promise(function(res,rej) {
+      var r = new FileReader();
+      r.onload = function() { res(r.result.split(",")[1]); };
+      r.onerror = rej;
+      r.readAsDataURL(file);
+    });
+  } catch(e) {
+    addLog("Could not read file: " + e.message, "err");
+    S.phase = "idle"; draw(); return;
+  }
+
+  var isPDF = ext === "pdf";
+  var mediaType = isPDF ? "application/pdf" : ext === "png" ? "image/png" : "image/jpeg";
+  addLog("Sending to Claude AI for extraction...", "step");
+
+  var fileBlock = isPDF
+    ? {type:"document", source:{type:"base64", media_type:mediaType, data:base64}}
+    : {type:"image",    source:{type:"base64", media_type:mediaType, data:base64}};
+
+  var prompt = "You are an invoice data extraction expert. Read this invoice and return ONLY a raw JSON object — no markdown, no backticks, no explanation. Must be directly parseable by JSON.parse().\n\n" +
+    '{"invoiceNumber":"exact invoice/PO/order number","invoiceDate":"YYYY-MM-DD or empty","dueDate":"YYYY-MM-DD or empty","vendorName":"seller company","customerName":"buyer company or person name","customerEmail":"buyer email or empty","customerPhone":"buyer phone or empty","customerAddress":"buyer full address or empty","paymentTerms":"e.g. Net 30 or empty","currency":"USD","subtotal":"decimal no $","tax":"decimal no $","total":"decimal no $","items":[{"item":"description and model/part#","qty":"number","unitCost":"decimal no $","total":"decimal no $"}],"notes":"payment instructions or empty"}\n\n' +
+    "Rules: invoiceNumber is critical — check Invoice #, Inv #, PO #, Order #. customerName = BUYER not seller. Extract ALL line items. Strip $ and commas from numbers. Dates as YYYY-MM-DD.";
+
+  var parsed = {};
+  try {
+    var resp = await fetch("https://api.anthropic.com/v1/messages", {
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "x-api-key": ANTHROPIC_KEY,
+        "anthropic-version":"2023-06-01",
+        "anthropic-dangerous-direct-browser-access":"true"
+      },
+      body: JSON.stringify({
+        model:"claude-sonnet-4-20250514",
+        max_tokens:2000,
+        messages:[{role:"user", content:[fileBlock,{type:"text",text:prompt}]}]
+      })
+    });
+    var data = await resp.json();
+    if (data.error) throw new Error(data.error.message||"Claude API error");
+    var raw = (data.content||[]).filter(function(b){return b.type==="text";})[0];
+    raw = raw ? raw.text : "";
+    try { parsed = JSON.parse(raw.trim()); }
+    catch(e1) {
+      try { parsed = JSON.parse(raw.replace(/```(?:json)?/g,"").replace(/```/g,"").trim()); }
+      catch(e2) { var m=raw.match(/\{[\s\S]*\}/); parsed = m ? JSON.parse(m[0]) : {}; }
+    }
+  } catch(e) {
+    addLog("AI extraction failed: " + e.message, "err");
+    addLog("You can still fill in fields manually below.", "warn");
+    parsed = {};
+  }
+
+  var items = (parsed.items||[]).map(function(it) {
+    var q=parseFloat(it.qty)||0, u=parseFloat(it.unitCost)||0;
+    var calc=(q*u).toFixed(2);
+    return {item:it.item||"", qty:it.qty||"", unitCost:it.unitCost||"", total:calc!=="0.00"?calc:(it.total||"0.00")};
+  });
+  if (items.length===0) items.push({item:"",qty:"1",unitCost:"0.00",total:"0.00"});
+
+  S.extracted = {
+    invoiceNumber: parsed.invoiceNumber||"",
+    invoiceDate:   parsed.invoiceDate||"",
+    dueDate:       parsed.dueDate||"",
+    vendorName:    parsed.vendorName||"",
+    customerName:  parsed.customerName||"",
+    customerEmail: parsed.customerEmail||"",
+    customerPhone: parsed.customerPhone||"",
+    customerAddress: parsed.customerAddress||"",
+    paymentTerms:  parsed.paymentTerms||"",
+    currency:      parsed.currency||"USD",
+    subtotal:      parsed.subtotal||"",
+    tax:           parsed.tax||"",
+    total:         parsed.total||"",
+    notes:         parsed.notes||"",
+    items:         items
+  };
+
+  if (parsed.invoiceNumber) addLog("Invoice #" + parsed.invoiceNumber + " extracted", "ok");
+  if (parsed.customerName)  addLog("Customer: " + parsed.customerName, "info");
+  addLog(items.length + " line item(s) · Total: " + fmtMoney(parsed.total||grandTotal()), "info");
+
+  S.phase = "review";
+  draw();
+}
+
+// ─── DRAW ──────────────────────────────────────────────────────────────────────
+function draw() {
+  var app = document.getElementById("app");
+
+  if (S.phase === "idle") {
+    app.innerHTML =
+      '<div class="upload-zone" id="uploadZone" onclick="pickFile()" ' +
+        'ondragover="event.preventDefault();this.classList.add(\'drag\')" ' +
+        'ondragleave="this.classList.remove(\'drag\')" ' +
+        'ondrop="handleDrop(event)">' +
+        '<div style="font-size:52px;margin-bottom:14px">📂</div>' +
+        '<div style="font-family:\'IBM Plex Mono\',monospace;font-weight:700;color:#e6edf3;font-size:16px;margin-bottom:8px">Drop invoice here or click to browse</div>' +
+        '<div style="color:#6e7681;font-size:12px">PDF · JPG · PNG · AI extracts all data automatically</div>' +
+        '<input id="fileIn" type="file" accept=".pdf,.jpg,.jpeg,.png" style="display:none" onchange="if(this.files[0])startProcess(this.files[0])"/>' +
+      '</div>' +
+      '<div class="card-dark">' +
+        '<div class="section-label">How It Works</div>' +
+        '<div class="how-grid">' +
+          '<div class="how-card"><div style="font-size:22px;margin-bottom:8px">1️⃣</div><div style="font-size:13px;font-weight:700;color:#e6edf3;margin-bottom:4px">Upload</div><div style="font-size:11px;color:#6e7681;line-height:1.6">Drop a PDF or image invoice — Claude AI reads every field and line item automatically</div></div>' +
+          '<div class="how-card"><div style="font-size:22px;margin-bottom:8px">2️⃣</div><div style="font-size:13px;font-weight:700;color:#e6edf3;margin-bottom:4px">Review</div><div style="font-size:11px;color:#6e7681;line-height:1.6">Check the extracted data and fix anything before exporting</div></div>' +
+          '<div class="how-card"><div style="font-size:22px;margin-bottom:8px">3️⃣</div><div style="font-size:13px;font-weight:700;color:#e6edf3;margin-bottom:4px">Export &amp; Import</div><div style="font-size:11px;color:#6e7681;line-height:1.6">Download a CSV file and drag it into Zendesk Sell — no API or token needed</div></div>' +
+        '</div>' +
+      '</div>';
+    return;
+  }
+
+  if (S.phase === "extracting") {
+    app.innerHTML =
+      '<div class="spinner-wrap">' +
+        '<div class="spin" style="font-size:44px;margin-bottom:14px">⚙️</div>' +
+        '<div style="font-family:\'IBM Plex Mono\',monospace;font-weight:700;font-size:15px;color:#58a6ff;margin-bottom:16px">Analyzing invoice with Claude AI...</div>' +
+        '<div class="log-panel" id="logPanel"></div>' +
+      '</div>';
+    flushLogs();
+    return;
+  }
+
+  if (S.phase === "review" && S.extracted) {
+    var ex = S.extracted;
+    app.innerHTML =
+      '<div class="card fade-up">' +
+        '<div class="section-label">📋 AI Extracted Data — Review &amp; Edit</div>' +
+        '<div class="fields-grid">' +
+          field("Invoice Number", "fInv", ex.invoiceNumber, "S.extracted.invoiceNumber=this.value", true) +
+          fieldDate("Invoice Date", "fIdate", ex.invoiceDate, "S.extracted.invoiceDate=this.value") +
+          fieldDate("Due Date", "fDdate", ex.dueDate, "S.extracted.dueDate=this.value") +
+          field("Vendor / Seller", "fVendor", ex.vendorName, "S.extracted.vendorName=this.value", false) +
+          field("Customer / Buyer *", "fCust", ex.customerName, "S.extracted.customerName=this.value", false) +
+          field("Payment Terms", "fTerms", ex.paymentTerms, "S.extracted.paymentTerms=this.value", false) +
+          field("Customer Email", "fEmail", ex.customerEmail, "S.extracted.customerEmail=this.value", false) +
+          field("Customer Phone", "fPhone", ex.customerPhone, "S.extracted.customerPhone=this.value", false) +
+          field("Customer Address", "fAddr", ex.customerAddress, "S.extracted.customerAddress=this.value", false) +
+        '</div>' +
+        '<div class="field" style="margin-bottom:16px">' +
+          '<label class="field-label">Notes</label>' +
+          '<textarea class="fi" rows="2" oninput="S.extracted.notes=this.value">' + esc(ex.notes) + '</textarea>' +
+        '</div>' +
+        '<div class="section-label">Line Items</div>' +
+        '<div id="itemsWrap"></div>' +
+      '</div>' +
+      '<div class="log-panel" id="logPanel"></div>' +
+      '<div id="exportArea"></div>' +
+      '<div style="margin-top:4px"><button class="btn btn-gray" onclick="resetAll()">← Start Over</button></div>';
+
+    drawItems();
+    flushLogs();
+    drawExportArea();
+    return;
+  }
+}
+
+function field(label, id, val, oninput, mono) {
+  return '<div class="field"><label class="field-label">' + label + '</label>' +
+    '<input class="fi' + (mono?" mono":"") + '" id="' + id + '" value="' + esc(val) + '" oninput="' + oninput + '"/></div>';
+}
+function fieldDate(label, id, val, oninput) {
+  return '<div class="field"><label class="field-label">' + label + '</label>' +
+    '<input type="date" class="fi" id="' + id + '" value="' + esc(val) + '" oninput="' + oninput + '"/></div>';
+}
+
+// ─── EXPORT AREA ───────────────────────────────────────────────────────────────
+function drawExportArea() {
+  var el = document.getElementById("exportArea");
+  if (!el) return;
+  el.innerHTML =
+    '<div class="export-box">' +
+      '<div class="export-title">✅ Ready to Export</div>' +
+      '<div class="export-sub">Download CSV files and import them directly into Zendesk Sell — no API token or proxy needed.</div>' +
+      '<div class="export-grid">' +
+        '<div class="export-card">' +
+          '<div class="export-card-title">👤 Contact CSV</div>' +
+          '<div class="export-card-desc">Creates the customer as a contact in Zendesk Sell with name, email, and phone.</div>' +
+          '<button class="btn btn-green btn-full" onclick="downloadContactCSV()">⬇ Download Contact CSV</button>' +
+        '</div>' +
+        '<div class="export-card">' +
+          '<div class="export-card-title">💼 Deal CSV</div>' +
+          '<div class="export-card-desc">Creates the deal with invoice number, value, and line items as notes.</div>' +
+          '<button class="btn btn-blue btn-full" onclick="downloadDealCSV()">⬇ Download Deal CSV</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="steps-box">' +
+        '<div class="steps-title">📥 How to import into Zendesk Sell</div>' +
+        '<div class="step-row"><div class="step-num">1</div><div class="step-text">Download the <strong style="color:#e6edf3">Contact CSV</strong> first and import it: in Zendesk Sell go to <strong style="color:#e6edf3">Contacts → Import</strong> and upload the file.</div></div>' +
+        '<div class="step-row"><div class="step-num">2</div><div class="step-text">Then download the <strong style="color:#e6edf3">Deal CSV</strong> and import it: go to <strong style="color:#e6edf3">Deals → Import</strong> and upload that file.</div></div>' +
+        '<div class="step-row"><div class="step-num">3</div><div class="step-text">Zendesk Sell will match the deal to the contact automatically using the contact name.</div></div>' +
+      '</div>' +
+    '</div>';
+}
+
+// ─── CSV GENERATION ────────────────────────────────────────────────────────────
+function csvCell(val) {
+  var s = String(val||"");
+  if (s.indexOf(",")!==-1 || s.indexOf('"')!==-1 || s.indexOf("\n")!==-1) {
+    return '"' + s.replace(/"/g,'""') + '"';
+  }
+  return s;
+}
+
+function csvRow(arr) {
+  return arr.map(csvCell).join(",");
+}
+
+function downloadContactCSV() {
+  var ex = S.extracted;
+  var headers = ["First Name","Last Name","Email","Phone","Mobile","Address","Tags"];
+  var nameParts = (ex.customerName||"Unknown").trim().split(" ");
+  var firstName = nameParts.length > 1 ? nameParts.slice(0,-1).join(" ") : nameParts[0];
+  var lastName  = nameParts.length > 1 ? nameParts[nameParts.length-1] : "";
+  var row = [firstName, lastName, ex.customerEmail||"", ex.customerPhone||"", "", ex.customerAddress||"", "invoice-import"];
+  var csv = csvRow(headers) + "\n" + csvRow(row);
+  downloadFile(csv, "contact-" + (ex.customerName||"unknown").replace(/\s+/g,"-").toLowerCase() + ".csv");
+}
+
+function downloadDealCSV() {
+  var ex = S.extracted;
+  var total = grandTotal();
+  var lineItems = (ex.items||[]).filter(function(it){return it.item||it.total!=="0.00";})
+    .map(function(it){ return it.item + " | Qty: " + (it.qty||1) + " x $" + parseFloat(it.unitCost||0).toFixed(2) + " = $" + parseFloat(it.total||0).toFixed(2); })
+    .join("; ");
+
+  var dealName = [
+    ex.invoiceNumber ? "INV-" + ex.invoiceNumber : null,
+    ex.customerName || null
+  ].filter(Boolean).join(" — ") || "Imported Invoice";
+
+  var headers = ["Deal Name","Contact Name","Value","Currency","Close Date","Stage","Tags","Notes"];
+  var row = [
+    dealName,
+    ex.customerName||"",
+    total.toFixed(2),
+    ex.currency||"USD",
+    ex.dueDate||ex.invoiceDate||"",
+    "Incoming",
+    "invoice-import",
+    [
+      ex.invoiceNumber ? "Invoice #: " + ex.invoiceNumber : "",
+      ex.invoiceDate   ? "Invoice Date: " + ex.invoiceDate : "",
+      ex.dueDate       ? "Due Date: " + ex.dueDate : "",
+      ex.vendorName    ? "Vendor: " + ex.vendorName : "",
+      ex.paymentTerms  ? "Terms: " + ex.paymentTerms : "",
+      lineItems        ? "Items: " + lineItems : "",
+      ex.notes         ? "Notes: " + ex.notes : "",
+    ].filter(Boolean).join(" | ")
+  ];
+  var csv = csvRow(headers) + "\n" + csvRow(row);
+  downloadFile(csv, "deal-" + (ex.invoiceNumber||"invoice").replace(/\s+/g,"-").toLowerCase() + ".csv");
+}
+
+function downloadFile(content, filename) {
+  var blob = new Blob([content], {type:"text/csv;charset=utf-8;"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ─── LINE ITEMS ────────────────────────────────────────────────────────────────
+function drawItems() {
+  var w = document.getElementById("itemsWrap");
+  if (!w) return;
+  var items = S.extracted.items;
+  var h = '<div class="items-hdr"><div class="items-col">Description / Model #</div><div class="items-col">Qty</div><div class="items-col">Unit Cost</div><div class="items-col">Total</div><div></div></div>';
+  items.forEach(function(it,i) {
+    h += '<div class="item-row">' +
+      '<input class="ii" value="'+esc(it.item||"")+'" placeholder="Description" oninput="updateItem('+i+',\'item\',this.value)"/>' +
+      '<input class="ii mono" value="'+esc(it.qty||"")+'" placeholder="1" oninput="updateItem('+i+',\'qty\',this.value)"/>' +
+      '<input class="ii mono" value="'+esc(it.unitCost||"")+'" placeholder="0.00" oninput="updateItem('+i+',\'unitCost\',this.value)"/>' +
+      '<input class="ii-total" readonly value="'+esc(it.total||"0.00")+'"/>' +
+      '<button class="ii-rm" onclick="removeItem('+i+')">✕</button>' +
+    '</div>';
+  });
+  var tot = grandTotal();
+  h += '<div class="items-footer"><button class="btn-add-line" onclick="addItem()">+ Add Line</button><span class="grand-total" id="gtEl">Total: '+fmtMoney(tot)+'</span></div>';
+  w.innerHTML = h;
+}
+
+function updateItem(i, field, val) {
+  S.extracted.items[i][field] = val;
+  var q = parseFloat(S.extracted.items[i].qty)||0;
+  var u = parseFloat(S.extracted.items[i].unitCost)||0;
+  S.extracted.items[i].total = (q*u).toFixed(2);
+  var rows = document.querySelectorAll(".item-row");
+  if (rows[i]) rows[i].querySelector(".ii-total").value = S.extracted.items[i].total;
+  var gt = document.getElementById("gtEl");
+  if (gt) gt.textContent = "Total: " + fmtMoney(grandTotal());
+}
+function addItem() { S.extracted.items.push({item:"",qty:"1",unitCost:"0.00",total:"0.00"}); drawItems(); }
+function removeItem(i) { S.extracted.items.splice(i,1); drawItems(); }
+
+function resetAll() {
+  S = { phase:"idle", logs:[], extracted:null };
+  draw();
+}
+
+// ─── INIT ──────────────────────────────────────────────────────────────────────
+initKeys();
+draw();
+</script>
+</body>
+</html>

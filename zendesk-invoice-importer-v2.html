@@ -126,7 +126,27 @@
 
 <div class="main">
 
-  <!-- TOKEN -->
+  <!-- ANTHROPIC KEY -->
+  <div class="card" id="anthropicSection">
+    <div class="section-label">🤖 Anthropic API Key <span style="color:#f85149;font-size:10px;margin-left:6px">REQUIRED FOR AI EXTRACTION</span></div>
+    <div class="token-row" id="anthropicInputRow">
+      <div class="token-wrap">
+        <input type="password" id="anthropicInput" class="token-input" placeholder="Paste your Anthropic API key (starts with sk-ant-...)"/>
+        <button class="token-eye" onclick="toggleAnthropicEye()">👁</button>
+      </div>
+      <button class="btn btn-green" onclick="saveAnthropicKey()">Save Key</button>
+    </div>
+    <div class="token-hint">
+      Get your key: <a href="https://console.anthropic.com" target="_blank">console.anthropic.com</a> → API Keys → Create Key
+      · Saved automatically on this computer. Paste fresh on other devices.
+    </div>
+    <div id="anthropicSavedBar" style="display:none" class="token-saved-bar">
+      <span>✓ Anthropic API key saved on this computer</span>
+      <button class="btn btn-ghost btn-sm" onclick="clearAnthropicKey()">Clear &amp; Change</button>
+    </div>
+  </div>
+
+  <!-- ZENDESK TOKEN -->
   <div class="card" id="tokenSection">
     <div class="section-label">🔑 Zendesk Sell API Token</div>
     <div class="token-row" id="tokenInputRow">
@@ -141,7 +161,7 @@
       · Saved automatically on this computer. Paste fresh on other devices.
     </div>
     <div id="tokenSavedBar" style="display:none" class="token-saved-bar">
-      <span>✓ Token saved on this computer</span>
+      <span>✓ Zendesk token saved on this computer</span>
       <button class="btn btn-ghost btn-sm" onclick="clearToken()">Clear &amp; Change</button>
     </div>
   </div>
@@ -164,15 +184,20 @@ let S = {
 
 // ─── TOKEN ─────────────────────────────────────────────────────────────────────
 let TOKEN = "";
+let ANTHROPIC_KEY = "";
 
 function initToken() {
   const t = localStorage.getItem("zd_invoice_token");
   if (t) { TOKEN = t; applyTokenSaved(); }
+  const a = localStorage.getItem("anthropic_api_key");
+  if (a) { ANTHROPIC_KEY = a; applyAnthropicSaved(); }
   refreshBadge();
 }
+
+// Zendesk token
 function saveToken() {
   const v = document.getElementById("tokenInput").value.trim();
-  if (!v) { alert("Please paste your token first."); return; }
+  if (!v) { alert("Please paste your Zendesk token first."); return; }
   TOKEN = v;
   localStorage.setItem("zd_invoice_token", v);
   applyTokenSaved();
@@ -193,14 +218,49 @@ function applyTokenSaved() {
 }
 function toggleEye() {
   const i = document.getElementById("tokenInput");
-  const b = document.querySelector(".token-eye");
+  const b = document.querySelector("#tokenInputRow .token-eye");
   i.type = i.type === "password" ? "text" : "password";
   b.textContent = i.type === "password" ? "👁" : "🙈";
 }
+
+// Anthropic key
+function saveAnthropicKey() {
+  const v = document.getElementById("anthropicInput").value.trim();
+  if (!v) { alert("Please paste your Anthropic API key first."); return; }
+  if (!v.startsWith("sk-ant-")) { alert("That doesn't look like an Anthropic key — it should start with sk-ant-"); return; }
+  ANTHROPIC_KEY = v;
+  localStorage.setItem("anthropic_api_key", v);
+  applyAnthropicSaved();
+  refreshBadge();
+}
+function clearAnthropicKey() {
+  ANTHROPIC_KEY = "";
+  localStorage.removeItem("anthropic_api_key");
+  document.getElementById("anthropicInput").value = "";
+  document.getElementById("anthropicInputRow").style.display = "flex";
+  document.getElementById("anthropicSavedBar").style.display = "none";
+  refreshBadge();
+}
+function applyAnthropicSaved() {
+  document.getElementById("anthropicInput").value = ANTHROPIC_KEY;
+  document.getElementById("anthropicInputRow").style.display = "none";
+  document.getElementById("anthropicSavedBar").style.display = "flex";
+}
+function toggleAnthropicEye() {
+  const i = document.getElementById("anthropicInput");
+  const b = document.querySelector("#anthropicInputRow .token-eye");
+  i.type = i.type === "password" ? "text" : "password";
+  b.textContent = i.type === "password" ? "👁" : "🙈";
+}
+
 function refreshBadge() {
-  document.getElementById("statusBadge").innerHTML = TOKEN
-    ? `<span class="tag" style="background:#23863622;color:#3fb950;border:1px solid #23863644">● TOKEN READY</span>`
-    : `<span class="tag" style="background:#d2992222;color:#d29922;border:1px solid #d2992244">○ NO TOKEN</span>`;
+  const both = TOKEN && ANTHROPIC_KEY;
+  const neither = !TOKEN && !ANTHROPIC_KEY;
+  document.getElementById("statusBadge").innerHTML = both
+    ? `<span class="tag" style="background:#23863622;color:#3fb950;border:1px solid #23863644">● READY</span>`
+    : neither
+    ? `<span class="tag" style="background:#f8514922;color:#f85149;border:1px solid #f8514944">○ KEYS NEEDED</span>`
+    : `<span class="tag" style="background:#d2992222;color:#d29922;border:1px solid #d2992244">○ INCOMPLETE</span>`;
 }
 
 // ─── LOGGING ───────────────────────────────────────────────────────────────────
@@ -262,6 +322,7 @@ function handleDrop(e) {
 function pickFile() { document.getElementById("fileIn").click(); }
 
 async function startProcess(file) {
+  if (!ANTHROPIC_KEY) { alert("Please save your Anthropic API key first."); return; }
   if (!TOKEN) { alert("Please save your Zendesk Sell API token first."); return; }
   const ext = file.name.split(".").pop().toLowerCase();
   if (!["pdf","jpg","jpeg","png"].includes(ext)) { alert("Please upload a PDF, JPG, or PNG."); return; }
@@ -317,7 +378,12 @@ Rules: invoiceNumber is critical. customerName = BUYER not seller. Extract ALL l
   try {
     const resp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-key": ANTHROPIC_KEY,
+        "anthropic-version": "2023-06-01",
+        "anthropic-dangerous-direct-browser-access": "true",
+      },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 2000,
